@@ -1,7 +1,10 @@
 using System;
+using System.Diagnostics;
+using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace MediaImport
 {
@@ -25,14 +28,16 @@ namespace MediaImport
 
         public void Import()
         {
-            var filesToCopy = SourceFolder.GetFiles("*." + Extension, SearchOption.AllDirectories)
-                .OrderBy(f => f.LastWriteTime)
+            var filesToCopy = (from file in SourceFolder.EnumerateFiles("*." + Extension, SearchOption.AllDirectories)
+                               let dateTaken = GetDateTaken(file.FullName)
+                               orderby dateTaken
+                               select Tuple.Create(file, dateTaken.Date))
                 .ToList();
-            var filesByDate = filesToCopy.GroupBy(f => f.LastWriteTime.Date);
+            var filesByDate = filesToCopy.GroupBy(x => x.Item2, x => x.Item1);
             FileCount = filesToCopy.Count();
             Console.WriteLine("Copying {0} files, {1:N0} MB",
                               FileCount,
-                              filesToCopy.Sum(f => f.Length / MiB));
+                              filesToCopy.Sum(f => f.Item1.Length / MiB));
             Counter = 0;
             foreach (var group in filesByDate)
                 ImportDay(group);
@@ -69,6 +74,25 @@ namespace MediaImport
                     fileInfo.MoveTo(targetFullName);
                 Console.WriteLine("[OK]");
             }
+        }
+
+        DateTime GetDateTaken(string fileName)
+        {
+            try
+            {
+                var image = new Bitmap(fileName);
+                var dateItem = image.GetPropertyItem(0x9003);
+                if (dateItem != null)
+                {
+                    var dateText = Encoding.ASCII.GetString(dateItem.Value);
+                    return DateTime.ParseExact(dateText, "yyyy:MM:dd HH:mm:ss\0", CultureInfo.InvariantCulture);
+                }
+            }
+            catch
+            {
+                Debug.WriteLine("Can't parse EXIF data for {0}", fileName);
+            }
+            return File.GetLastWriteTime(fileName);
         }
     }
 }
