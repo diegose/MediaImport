@@ -80,12 +80,14 @@ namespace MediaImport
         {
             try
             {
-                var image = new Bitmap(fileName);
-                var dateItem = image.GetPropertyItem(0x9003);
-                if (dateItem != null)
+                using (var image = new Bitmap(fileName))
                 {
-                    var dateText = Encoding.ASCII.GetString(dateItem.Value);
-                    return DateTime.ParseExact(dateText, "yyyy:MM:dd HH:mm:ss\0", CultureInfo.InvariantCulture);
+                    var dateItem = image.GetPropertyItem(0x9003);
+                    if (dateItem != null)
+                    {
+                        var dateText = Encoding.ASCII.GetString(dateItem.Value);
+                        return DateTime.ParseExact(dateText, "yyyy:MM:dd HH:mm:ss\0", CultureInfo.InvariantCulture);
+                    }
                 }
             }
             catch
