@@ -3,3 +3,4 @@ obj
 *.suo
 bin
 *.user
+_Resharper*
