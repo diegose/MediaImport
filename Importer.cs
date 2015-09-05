@@ -34,13 +34,13 @@ namespace MediaImport
                                select Tuple.Create(file, dateTaken.Date))
                 .ToList();
             var filesByDate = filesToCopy.GroupBy(x => x.Item2, x => x.Item1);
-            FileCount = filesToCopy.Count();
-            Console.WriteLine("Copying {0} files, {1:N0} MB",
-                              FileCount,
-                              filesToCopy.Sum(f => f.Item1.Length / MiB));
+            FileCount = filesToCopy.Count;
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine($"Copying {FileCount} files, {filesToCopy.Sum(f => f.Item1.Length / MiB):N0} MB");
             Counter = 0;
             foreach (var group in filesByDate)
                 ImportDay(group);
+            Console.ResetColor();
         }
 
         void ImportDay(IGrouping<DateTime, FileInfo> day)
@@ -51,7 +51,7 @@ namespace MediaImport
             var suffix = 0;
             if (yearFolder.Exists)
             {
-                var existingFiles = yearFolder.GetFiles(prefix + "???." + Extension);
+                var existingFiles = yearFolder.GetFiles($"{prefix}???.{Extension}");
                 suffix = existingFiles
                              .Select(f => (int?)Convert.ToInt32(f.Name.Substring(prefix.Length, 3)))
                              .Max() ?? 0;
@@ -62,21 +62,25 @@ namespace MediaImport
             {
                 suffix++;
                 Counter++;
-                var targetName = prefix + suffix.ToString("000") + "." + Extension;
-                var targetFullName = Path.Combine(yearFolder.FullName, targetName);
-                Console.Write("[{0}/{1}] {2} -> {3} ({4:N0} MB)",
-                              Counter,
-                              FileCount,
-                              fileInfo.FullName,
-                              targetFullName,
-                              fileInfo.Length / MiB);
+                var targetFullName = Path.Combine(yearFolder.FullName, $"{prefix}{suffix:000}.{Extension}");
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.Write($"[{Counter}/{FileCount}] ");
+                Console.ResetColor();
+                Console.Write(fileInfo.FullName);
+                Console.ForegroundColor = ConsoleColor.Magenta;
+                Console.Write(" -> ");
+                Console.ResetColor();
+                Console.Write(targetFullName);
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write($" ({fileInfo.Length / MiB:N0} MB) ");
+                Console.ResetColor();
                 if (!Test)
                     fileInfo.MoveTo(targetFullName);
                 Console.WriteLine("[OK]");
             }
         }
 
-        DateTime GetDateTaken(string fileName)
+        static DateTime GetDateTaken(string fileName)
         {
             try
             {
