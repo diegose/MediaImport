@@ -28,15 +28,16 @@ namespace MediaImport
 
         public void Import()
         {
-            var filesToCopy = (from file in SourceFolder.EnumerateFiles("*." + Extension, SearchOption.AllDirectories)
-                               let dateTaken = GetDateTaken(file.FullName)
-                               orderby dateTaken
-                               select Tuple.Create(file, dateTaken.Date))
-                .ToList();
-            var filesByDate = filesToCopy.GroupBy(x => x.Item2, x => x.Item1);
-            FileCount = filesToCopy.Count;
+            var files = SourceFolder.GetFiles($"*.{Extension}", SearchOption.AllDirectories);
+            FileCount = files.Length;
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine($"Copying {FileCount} files, {filesToCopy.Sum(f => f.Item1.Length / MiB):N0} MB");
+            Console.WriteLine($"Moving {FileCount} files, {files.Sum(f => f.Length / MiB):N0} MB");
+            var filesWithMetadata = (from file in files
+                                     let dateTaken = GetDateTaken(file.FullName)
+                                     orderby dateTaken
+                                     select new {file, dateTaken.Date})
+                .ToList();
+            var filesByDate = filesWithMetadata.GroupBy(x => x.Date, x => x.file);
             Counter = 0;
             foreach (var group in filesByDate)
                 ImportDay(group);
@@ -82,6 +83,8 @@ namespace MediaImport
 
         static DateTime GetDateTaken(string fileName)
         {
+            Console.ResetColor();
+            Console.Write($"Reading {fileName} date ");
             try
             {
                 using (var image = new Bitmap(fileName))
@@ -90,14 +93,19 @@ namespace MediaImport
                     if (dateItem != null)
                     {
                         var dateText = Encoding.ASCII.GetString(dateItem.Value);
-                        return DateTime.ParseExact(dateText, "yyyy:MM:dd HH:mm:ss\0", CultureInfo.InvariantCulture);
+                        var dateTaken = DateTime.ParseExact(dateText, "yyyy:MM:dd HH:mm:ss\0", CultureInfo.InvariantCulture);
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.WriteLine("[EXIF]");
+                        return dateTaken;
                     }
                 }
             }
             catch
             {
-                Debug.WriteLine("Can't parse EXIF data for {0}", fileName);
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("[Last Write]");
             }
+            Console.ResetColor();
             return File.GetLastWriteTime(fileName);
         }
     }
