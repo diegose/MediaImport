@@ -9,28 +9,24 @@ namespace MediaImport
 {
     class Importer
     {
-        readonly DirectoryInfo SourceFolder;
-        readonly DirectoryInfo TargetFolder;
-        readonly string Extension;
-        readonly bool Test;
+        readonly ImportOptions Options;
         int Counter;
         int FileCount;
         static readonly double MiB = Math.Pow(2, 20);
 
-        public Importer(DirectoryInfo sourceFolder, DirectoryInfo targetFolder, string extension, bool test)
+        public Importer(ImportOptions options)
         {
-            SourceFolder = sourceFolder;
-            TargetFolder = targetFolder;
-            Extension = extension;
-            Test = test;
+            Options = options;
         }
 
         public void Import()
         {
-            var files = SourceFolder.GetFiles($"*.{Extension}", SearchOption.AllDirectories);
+            var files = Options.SourceFolder.GetFiles($"*.{Options.Extension}", SearchOption.AllDirectories);
             FileCount = files.Length;
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine($"Moving {FileCount} files, {files.Sum(f => f.Length / MiB):N0} MB");
+            var operation = Options.Copy ? "Copying" : "Moving";
+            var dryRunLegend = Options.DryRun ? " (not really!)" : "";
+            Console.WriteLine($"{operation} {FileCount} files{dryRunLegend}, {files.Sum(f => f.Length / MiB):N0} MB");
             var filesWithMetadata = (from file in files
                                      let dateTaken = GetDateTaken(file.FullName)
                                      orderby dateTaken
@@ -45,24 +41,24 @@ namespace MediaImport
 
         void ImportDay(IGrouping<DateTime, FileInfo> day)
         {
-            var yearFolder = new DirectoryInfo(Path.Combine(TargetFolder.FullName,
+            var yearFolder = new DirectoryInfo(Path.Combine(Options.TargetFolder.FullName,
                                                             day.Key.Year.ToString(CultureInfo.InvariantCulture)));
             var prefix = day.Key.ToString("yyyy-MM-dd-");
             var suffix = 0;
             if (yearFolder.Exists)
             {
-                var existingFiles = yearFolder.GetFiles($"{prefix}???.{Extension}");
+                var existingFiles = yearFolder.GetFiles($"{prefix}???.{Options.Extension}");
                 suffix = existingFiles
                              .Select(f => (int?)Convert.ToInt32(f.Name.Substring(prefix.Length, 3)))
                              .Max() ?? 0;
             }
-            else if (!Test)
+            else if (!Options.DryRun)
                 yearFolder.Create();
             foreach (var fileInfo in day)
             {
                 suffix++;
                 Counter++;
-                var targetFullName = Path.Combine(yearFolder.FullName, $"{prefix}{suffix:000}.{Extension}");
+                var targetFullName = Path.Combine(yearFolder.FullName, $"{prefix}{suffix:000}.{Options.Extension}");
                 Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.Write($"[{Counter}/{FileCount}] ");
                 Console.ResetColor();
@@ -74,8 +70,11 @@ namespace MediaImport
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.Write($" ({fileInfo.Length / MiB:N0} MB) ");
                 Console.ResetColor();
-                if (!Test)
-                    fileInfo.MoveTo(targetFullName);
+                if (!Options.DryRun)
+                    if (Options.Copy)
+                        fileInfo.CopyTo(targetFullName);
+                    else
+                        fileInfo.MoveTo(targetFullName);
                 Console.WriteLine("[OK]");
             }
         }

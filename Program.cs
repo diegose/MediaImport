@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+﻿using CommandLine;
 
 namespace MediaImport
 {
@@ -7,17 +6,10 @@ namespace MediaImport
     {
         static void Main(string[] args)
         {
-            if (args.Length < 3)
+            var options = new ImportOptions();
+            if (Parser.Default.ParseArguments(args, options))
             {
-                Console.WriteLine(@"Usage: MediaImport source target extension [/test]");
-            }
-            else
-            {
-                var sourceFolder = new DirectoryInfo(args[0]);
-                var targetFolder = new DirectoryInfo(args[1]);
-                var extension = args[2];
-                var test = args.Length == 4 && "/test".Equals(args[3], StringComparison.InvariantCultureIgnoreCase);
-                var importer = new Importer(sourceFolder, targetFolder, extension, test);
+                var importer = new Importer(options);
                 importer.Import();
             }
         }
